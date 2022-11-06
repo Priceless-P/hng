@@ -1,6 +1,8 @@
-#!/usr/bin/python3
-import pandas as pd
 import hashlib
+from itertools import zip_longest
+import pandas as pd
+
+hashed_list = []
 
 
 def welcome():
@@ -16,7 +18,6 @@ def compute_hash():
     hashed_list = []
 
     df = pd.read_csv(filename)
-
     df['format'] = "CHIP_0007"
     df['name'] = df["Name"]
     df['description'] = df["Description"]
@@ -28,33 +29,38 @@ def compute_hash():
     df['trait_type'] = df['gender']
     df['value'] = df["Gender"]
     df['id'] = df["UUID"]
+
+    df['attributes'] = df[['trait_type', 'value']].to_dict('records')
+    df['attribute'] = df[['trait_type', 'value']].to_dict('records')
+    df['collection'] = df[['name', 'id', 'attribute']].to_dict('records')
     re = df['Attributes- Hair. Eyes. Teeth. Clothing. Accessories. Expression. Strength. Weakness'].tolist()
     for item in re:
 
         res = item.split(', ')
         for i in res:
             j = i.split(':')
+            j = list(j)
 
-        df['attributes'] = pd.DataFrame(res, columns=['trait_type'])
+            key = ['trait_type', 'value']
+            d1 = zip_longest(key, j, fillvalue='trait_type')
 
-    df['collection'] = df[['name', 'id', 'attributes']].to_dict('records')
+            abb = pd.DataFrame(dict(d1), index=[0])
+            pd.concat([df['attributes'], abb], ignore_index=True, axis=0)
+
     print(df[['format', 'name', 'description', 'minting_tool', 'sensitive_content',
               'series_number', 'series_total', 'attributes', 'collection']].to_json(json_file, orient='records',
                                                                                     indent=4))
-
+    hashed_list.append(['hash'])
     with open(json_file, 'rb') as f:
         for line in f:
             hashed_line = hashlib.sha256(line.rstrip()).hexdigest()
             hashed_list.append(hashed_line)
 
-    with open(filename, 'r') as firstfile, open(new_file, 'w') as secondfile:
-
-        for line in firstfile:
-            secondfile.write(line)
-
-        csv_input = pd.read_csv(filename)
-        csv_input['Hash'] = csv_input['Name']
-        csv_input.to_csv(new_file, index=False)
+    df = pd.read_csv(filename, index_col=[0])
+    df["Hash"] = hashed_line
+    df.replace("", inplace=True)
+    df.dropna(how='all', axis=1, inplace=True)
+    df.to_csv(new_file)
 
 
 if __name__ == '__main__':
